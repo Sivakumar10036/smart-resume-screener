@@ -38,7 +38,7 @@ app = FastAPI(
 allowed_origins = [
     "http://localhost:5173",
     "http://127.0.0.1:5173",
-    "https://smart-resume-screener-nine.vercel.app"
+    "https://smart-ai-resume-screener.vercel.app"
 ]
 
 
