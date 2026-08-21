@@ -9,6 +9,77 @@ const AuthContext =
     createContext(null);
 
 
+function normalizeUser(
+    storedUser
+) {
+
+    if (!storedUser) {
+
+        return null;
+
+    }
+
+
+    try {
+
+        const parsedUser =
+            typeof storedUser === "string"
+                ? JSON.parse(storedUser)
+                : storedUser;
+
+
+        if (!parsedUser) {
+
+            return null;
+
+        }
+
+
+        return {
+
+            ...parsedUser,
+
+            role:
+                String(
+                    parsedUser.role ||
+                    "VIEWER"
+                ).toUpperCase(),
+
+            status:
+                String(
+                    parsedUser.status ||
+                    "ACTIVE"
+                ).toUpperCase(),
+
+            is_active:
+                parsedUser.is_active !== false
+
+        };
+
+    } catch {
+
+        return null;
+
+    }
+
+}
+
+
+function getStoredUser() {
+
+    const storedUser =
+        localStorage.getItem(
+            "user"
+        );
+
+
+    return normalizeUser(
+        storedUser
+    );
+
+}
+
+
 export function AuthProvider({
     children
 }) {
@@ -18,9 +89,10 @@ export function AuthProvider({
         setToken
     ] = useState(
 
-        localStorage.getItem(
-            "access_token"
-        )
+        () =>
+            localStorage.getItem(
+                "access_token"
+            )
 
     );
 
@@ -30,36 +102,8 @@ export function AuthProvider({
         setUser
     ] = useState(
 
-        () => {
-
-            const storedUser =
-                localStorage.getItem(
-                    "user"
-                );
-
-
-            if (
-                !storedUser
-            ) {
-
-                return null;
-
-            }
-
-
-            try {
-
-                return JSON.parse(
-                    storedUser
-                );
-
-            } catch {
-
-                return null;
-
-            }
-
-        }
+        () =>
+            getStoredUser()
 
     );
 
@@ -68,6 +112,22 @@ export function AuthProvider({
         loginToken,
         loginUser
     ) => {
+
+        const normalizedUser =
+            normalizeUser(
+                loginUser
+            );
+
+
+        if (
+            !loginToken ||
+            !normalizedUser
+        ) {
+
+            return;
+
+        }
+
 
         localStorage.setItem(
             "access_token",
@@ -78,7 +138,7 @@ export function AuthProvider({
         localStorage.setItem(
             "user",
             JSON.stringify(
-                loginUser
+                normalizedUser
             )
         );
 
@@ -89,7 +149,7 @@ export function AuthProvider({
 
 
         setUser(
-            loginUser
+            normalizedUser
         );
 
     };
@@ -119,17 +179,50 @@ export function AuthProvider({
     };
 
 
+    const isAuthenticated =
+        Boolean(
+            token &&
+            user
+        );
+
+
+    const isAdmin =
+        user?.role ===
+        "ADMIN";
+
+
+    const isRecruiter =
+        user?.role ===
+        "RECRUITER";
+
+
+    const isViewer =
+        user?.role ===
+        "VIEWER";
+
+
     return (
 
         <AuthContext.Provider
 
             value={{
+
                 token,
+
                 user,
+
                 login,
+
                 logout,
-                isAuthenticated:
-                    Boolean(token)
+
+                isAuthenticated,
+
+                isAdmin,
+
+                isRecruiter,
+
+                isViewer
+
             }}
 
         >
@@ -145,8 +238,21 @@ export function AuthProvider({
 
 export function useAuth() {
 
-    return useContext(
-        AuthContext
-    );
+    const context =
+        useContext(
+            AuthContext
+        );
+
+
+    if (!context) {
+
+        throw new Error(
+            "useAuth must be used inside AuthProvider"
+        );
+
+    }
+
+
+    return context;
 
 }

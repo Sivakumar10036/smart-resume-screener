@@ -1,11 +1,17 @@
 from typing import List
 
-from pydantic import BaseModel
+from pydantic import (
+    BaseModel,
+    Field
+)
 
 
 class ScreeningResult(BaseModel):
 
-    match_score: float
+    match_score: float = Field(
+        ge=0,
+        le=100
+    )
 
     matched_skills: List[str]
 
@@ -33,7 +39,10 @@ class RankedCandidate(BaseModel):
 
     candidate_name: str
 
-    match_score: float
+    match_score: float = Field(
+        ge=0,
+        le=100
+    )
 
     recommendation: str
 

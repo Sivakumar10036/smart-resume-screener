@@ -1,8 +1,4 @@
-from datetime import (
-    datetime,
-    timedelta,
-    timezone
-)
+from datetime import datetime, timedelta, timezone
 
 import jwt
 
@@ -40,7 +36,6 @@ oauth2_scheme = OAuth2PasswordBearer(
 def hash_password(
     password: str
 ):
-
     return password_hash.hash(
         password
     )
@@ -50,11 +45,13 @@ def verify_password(
     password: str,
     hashed_password: str
 ):
-
-    return password_hash.verify(
-        password,
-        hashed_password
-    )
+    try:
+        return password_hash.verify(
+            password,
+            hashed_password
+        )
+    except Exception:
+        return False
 
 
 def create_access_token(
@@ -63,6 +60,10 @@ def create_access_token(
     role: str
 ):
 
+    normalized_role = str(
+        role
+    ).upper()
+
     expire = (
         datetime.now(
             timezone.utc
@@ -70,8 +71,7 @@ def create_access_token(
         +
         timedelta(
             minutes=
-                settings
-                .jwt_access_token_expire_minutes
+                settings.jwt_access_token_expire_minutes
         )
     )
 
@@ -86,10 +86,11 @@ def create_access_token(
             username,
 
         "role":
-            role,
+            normalized_role,
 
         "exp":
             expire
+
     }
 
     return jwt.encode(
@@ -117,16 +118,21 @@ def get_current_user(
             "WWW-Authenticate":
                 "Bearer"
         }
+
     )
 
     try:
 
         payload = jwt.decode(
+
             token,
+
             settings.jwt_secret_key,
+
             algorithms=[
                 settings.jwt_algorithm
             ]
+
         )
 
         user_id = payload.get(
@@ -137,35 +143,35 @@ def get_current_user(
 
             raise credentials_exception
 
-        user_object_id = ObjectId(
-            user_id
-        )
+        try:
 
-    except (
-        InvalidTokenError,
-        ValueError
-    ):
+            user_object_id = ObjectId(
+                user_id
+            )
+
+        except Exception:
+
+            raise credentials_exception
+
+    except InvalidTokenError:
 
         raise credentials_exception
 
-    user = (
-        users_collection
-        .find_one(
-            {
-                "_id":
-                    user_object_id
-            }
-        )
+    user = users_collection.find_one(
+        {
+            "_id":
+                user_object_id
+        }
     )
 
     if not user:
 
         raise credentials_exception
 
-    if not user.get(
+    if user.get(
         "is_active",
         True
-    ):
+    ) is False:
 
         raise HTTPException(
 
@@ -173,8 +179,16 @@ def get_current_user(
                 status.HTTP_403_FORBIDDEN,
 
             detail=
-                "User account is disabled"
+                "Your account is disabled"
+
         )
+
+    user["role"] = str(
+        user.get(
+            "role",
+            "VIEWER"
+        )
+    ).upper()
 
     return user
 
@@ -183,19 +197,28 @@ def require_roles(
     *allowed_roles
 ):
 
+    normalized_allowed_roles = {
+
+        str(role).upper()
+
+        for role in allowed_roles
+
+    }
+
     def role_checker(
         current_user=Depends(
             get_current_user
         )
     ):
 
-        user_role = (
+        user_role = str(
             current_user.get(
-                "role"
+                "role",
+                "VIEWER"
             )
-        )
+        ).upper()
 
-        if user_role not in allowed_roles:
+        if user_role not in normalized_allowed_roles:
 
             raise HTTPException(
 
@@ -204,6 +227,7 @@ def require_roles(
 
                 detail=
                     "You do not have permission to perform this action"
+
             )
 
         return current_user

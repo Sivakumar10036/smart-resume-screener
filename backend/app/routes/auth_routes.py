@@ -1,5 +1,7 @@
 from datetime import datetime, timezone
 
+from bson import ObjectId
+
 from fastapi import (
     APIRouter,
     Depends,
@@ -11,20 +13,19 @@ from fastapi.security import (
     OAuth2PasswordRequestForm
 )
 
-from bson import ObjectId
-
 from app.database import users_collection
 
 from app.schemas.auth_schema import (
-    RegisterRequest
+    RegisterRequest,
+    LoginResponse
 )
 
 from app.utils.security import (
-    hash_password,
-    verify_password,
     create_access_token,
     get_current_user,
-    require_roles
+    hash_password,
+    require_roles,
+    verify_password
 )
 
 
@@ -34,14 +35,19 @@ router = APIRouter(
 )
 
 
-@router.post("/register")
-def register(
-    request: RegisterRequest
+@router.post(
+    "/register"
+)
+def register_user(
+    user_data: RegisterRequest
 ):
 
-    username = request.username.strip()
+    username = user_data.username.strip()
 
-    email = request.email.strip().lower()
+    email = user_data.email.strip().lower()
+
+    password = user_data.password
+
 
     if not username:
 
@@ -50,6 +56,7 @@ def register(
             detail="Username is required"
         )
 
+
     if not email:
 
         raise HTTPException(
@@ -57,41 +64,62 @@ def register(
             detail="Email is required"
         )
 
-    if len(request.password) < 6:
+
+    if not password:
 
         raise HTTPException(
             status_code=400,
-            detail=
-                "Password must contain at least 6 characters"
+            detail="Password is required"
         )
 
-    existing_user = (
-        users_collection
-        .find_one(
-            {
-                "$or": [
-                    {
-                        "username":
-                            username
-                    },
-                    {
-                        "email":
-                            email
-                    }
-                ]
-            }
+
+    if len(password) < 6:
+
+        raise HTTPException(
+            status_code=400,
+            detail="Password must contain at least 6 characters"
         )
+
+
+    existing_user = users_collection.find_one(
+
+        {
+            "$or": [
+
+                {
+                    "username":
+                        username
+                },
+
+                {
+                    "email":
+                        email
+                }
+
+            ]
+        }
+
     )
+
 
     if existing_user:
 
         raise HTTPException(
+
             status_code=400,
+
             detail=
                 "Username or email already exists"
+
         )
 
-    user_document = {
+
+    hashed_password = hash_password(
+        password
+    )
+
+
+    user = {
 
         "username":
             username,
@@ -100,36 +128,34 @@ def register(
             email,
 
         "hashed_password":
-            hash_password(
-                request.password
-            ),
+            hashed_password,
 
         "role":
             "VIEWER",
 
         "status":
-            "PENDING",
+            "ACTIVE",
 
         "is_active":
-            False,
+            True,
 
         "created_at":
             datetime.now(
                 timezone.utc
             )
+
     }
 
-    result = (
-        users_collection
-        .insert_one(
-            user_document
-        )
+
+    result = users_collection.insert_one(
+        user
     )
+
 
     return {
 
         "message":
-            "Registration successful. Your account is waiting for administrator approval.",
+            "Account created successfully",
 
         "user_id":
             str(
@@ -139,30 +165,45 @@ def register(
         "username":
             username,
 
+        "email":
+            email,
+
         "role":
             "VIEWER",
 
         "status":
-            "PENDING"
+            "ACTIVE",
+
+        "is_active":
+            True
+
     }
 
 
-@router.post("/login")
-def login(
+@router.post(
+    "/login",
+    response_model=LoginResponse
+)
+def login_user(
+
     form_data:
         OAuth2PasswordRequestForm =
             Depends()
+
 ):
 
-    user = (
-        users_collection
-        .find_one(
-            {
-                "username":
-                    form_data.username
-            }
-        )
+    username = form_data.username.strip()
+
+
+    user = users_collection.find_one(
+
+        {
+            "username":
+                username
+        }
+
     )
+
 
     if not user:
 
@@ -172,25 +213,29 @@ def login(
                 status.HTTP_401_UNAUTHORIZED,
 
             detail=
-                "Incorrect username or password",
+                "Invalid username or password",
 
             headers={
                 "WWW-Authenticate":
                     "Bearer"
             }
+
         )
 
-    password_valid = verify_password(
 
-        form_data.password,
+    stored_password = user.get(
+
+        "hashed_password",
 
         user.get(
-            "hashed_password",
+            "password",
             ""
         )
+
     )
 
-    if not password_valid:
+
+    if not stored_password:
 
         raise HTTPException(
 
@@ -198,62 +243,93 @@ def login(
                 status.HTTP_401_UNAUTHORIZED,
 
             detail=
-                "Incorrect username or password",
+                "Invalid username or password",
 
             headers={
                 "WWW-Authenticate":
                     "Bearer"
             }
+
         )
 
-    user_status = user.get(
-        "status",
-        "ACTIVE"
-    )
 
-    if user_status == "PENDING":
+    if not verify_password(
 
-        raise HTTPException(
+        form_data.password,
 
-            status_code=403,
+        stored_password
 
-            detail=
-                "Your account is waiting for administrator approval"
-        )
-
-    if user_status == "REJECTED":
-
-        raise HTTPException(
-
-            status_code=403,
-
-            detail=
-                "Your account registration was rejected"
-        )
-
-    if not user.get(
-        "is_active",
-        False
     ):
 
         raise HTTPException(
 
-            status_code=403,
+            status_code=
+                status.HTTP_401_UNAUTHORIZED,
 
             detail=
-                "User account is disabled"
+                "Invalid username or password",
+
+            headers={
+                "WWW-Authenticate":
+                    "Bearer"
+            }
+
         )
+
+
+    is_active = user.get(
+        "is_active",
+        True
+    )
+
+
+    if is_active is False:
+
+        raise HTTPException(
+
+            status_code=
+                status.HTTP_403_FORBIDDEN,
+
+            detail=
+                "Your account is disabled"
+
+        )
+
+
+    role = str(
+
+        user.get(
+            "role",
+            "VIEWER"
+        )
+
+    ).upper()
+
+
+    if role not in [
+        "VIEWER",
+        "RECRUITER",
+        "ADMIN"
+    ]:
+
+        role = "VIEWER"
+
 
     access_token = create_access_token(
 
-        str(
-            user["_id"]
-        ),
+        user_id=
+            str(
+                user["_id"]
+            ),
 
-        user["username"],
+        username=
+            user["username"],
 
-        user["role"]
+        role=
+            role
+
     )
+
 
     return {
 
@@ -271,13 +347,19 @@ def login(
                 ),
 
             "username":
-                user["username"],
+                user.get(
+                    "username",
+                    ""
+                ),
 
             "email":
-                user["email"],
+                user.get(
+                    "email",
+                    ""
+                ),
 
             "role":
-                user["role"],
+                role,
 
             "status":
                 user.get(
@@ -286,20 +368,33 @@ def login(
                 ),
 
             "is_active":
-                user.get(
-                    "is_active",
-                    False
-                )
+                True
+
         }
+
     }
 
 
-@router.get("/me")
+@router.get(
+    "/me"
+)
 def get_me(
+
     current_user=Depends(
         get_current_user
     )
+
 ):
+
+    role = str(
+
+        current_user.get(
+            "role",
+            "VIEWER"
+        )
+
+    ).upper()
+
 
     return {
 
@@ -309,13 +404,19 @@ def get_me(
             ),
 
         "username":
-            current_user["username"],
+            current_user.get(
+                "username",
+                ""
+            ),
 
         "email":
-            current_user["email"],
+            current_user.get(
+                "email",
+                ""
+            ),
 
         "role":
-            current_user["role"],
+            role,
 
         "status":
             current_user.get(
@@ -326,236 +427,103 @@ def get_me(
         "is_active":
             current_user.get(
                 "is_active",
-                False
+                True
             )
+
     }
 
 
-@router.get("/users")
+@router.get(
+    "/users"
+)
 def get_users(
+
     current_user=Depends(
         require_roles(
             "ADMIN"
         )
     )
+
 ):
 
     users = list(
 
-        users_collection
-        .find(
+        users_collection.find(
+
             {},
+
             {
-                "hashed_password": 0
+                "hashed_password": 0,
+                "password": 0
             }
-        )
-        .sort(
+
+        ).sort(
+
             "created_at",
             -1
+
         )
+
     )
+
+
+    result = []
+
 
     for user in users:
 
-        user["_id"] = str(
-            user["_id"]
-        )
+        role = str(
+
+            user.get(
+                "role",
+                "VIEWER"
+            )
+
+        ).upper()
+
+
+        result.append({
+
+            "id":
+                str(
+                    user["_id"]
+                ),
+
+            "username":
+                user.get(
+                    "username",
+                    ""
+                ),
+
+            "email":
+                user.get(
+                    "email",
+                    ""
+                ),
+
+            "role":
+                role,
+
+            "status":
+                user.get(
+                    "status",
+                    "ACTIVE"
+                ),
+
+            "is_active":
+                user.get(
+                    "is_active",
+                    True
+                )
+
+        })
+
 
     return {
-
-        "total":
-            len(users),
 
         "users":
-            users
-    }
+            result
 
-
-@router.put(
-    "/users/{user_id}/approve"
-)
-def approve_user(
-    user_id: str,
-    current_user=Depends(
-        require_roles(
-            "ADMIN"
-        )
-    )
-):
-
-    try:
-
-        target_user_id = ObjectId(
-            user_id
-        )
-
-    except Exception:
-
-        raise HTTPException(
-            status_code=400,
-            detail="Invalid user ID"
-        )
-
-    target_user = (
-        users_collection
-        .find_one(
-            {
-                "_id":
-                    target_user_id
-            }
-        )
-    )
-
-    if not target_user:
-
-        raise HTTPException(
-            status_code=404,
-            detail="User not found"
-        )
-
-    if target_user.get(
-        "role"
-    ) == "ADMIN":
-
-        raise HTTPException(
-            status_code=400,
-            detail=
-                "Administrator account does not require approval"
-        )
-
-    users_collection.update_one(
-
-        {
-            "_id":
-                target_user_id
-        },
-
-        {
-            "$set": {
-
-                "status":
-                    "ACTIVE",
-
-                "is_active":
-                    True,
-
-                "approved_at":
-                    datetime.now(
-                        timezone.utc
-                    ),
-
-                "approved_by":
-                    str(
-                        current_user["_id"]
-                    )
-            }
-        }
-    )
-
-    return {
-
-        "message":
-            "User approved successfully",
-
-        "user_id":
-            user_id,
-
-        "status":
-            "ACTIVE"
-    }
-
-
-@router.put(
-    "/users/{user_id}/reject"
-)
-def reject_user(
-    user_id: str,
-    current_user=Depends(
-        require_roles(
-            "ADMIN"
-        )
-    )
-):
-
-    try:
-
-        target_user_id = ObjectId(
-            user_id
-        )
-
-    except Exception:
-
-        raise HTTPException(
-            status_code=400,
-            detail="Invalid user ID"
-        )
-
-    target_user = (
-        users_collection
-        .find_one(
-            {
-                "_id":
-                    target_user_id
-            }
-        )
-    )
-
-    if not target_user:
-
-        raise HTTPException(
-            status_code=404,
-            detail="User not found"
-        )
-
-    if target_user.get(
-        "role"
-    ) == "ADMIN":
-
-        raise HTTPException(
-            status_code=400,
-            detail=
-                "Administrator account cannot be rejected"
-        )
-
-    users_collection.update_one(
-
-        {
-            "_id":
-                target_user_id
-        },
-
-        {
-            "$set": {
-
-                "status":
-                    "REJECTED",
-
-                "is_active":
-                    False,
-
-                "rejected_at":
-                    datetime.now(
-                        timezone.utc
-                    ),
-
-                "rejected_by":
-                    str(
-                        current_user["_id"]
-                    )
-            }
-        }
-    )
-
-    return {
-
-        "message":
-            "User rejected successfully",
-
-        "user_id":
-            user_id,
-
-        "status":
-            "REJECTED"
     }
 
 
@@ -563,104 +531,102 @@ def reject_user(
     "/users/{user_id}/role"
 )
 def change_user_role(
+
     user_id: str,
+
     role: str,
+
     current_user=Depends(
         require_roles(
             "ADMIN"
         )
     )
+
 ):
 
     role = role.strip().upper()
 
+
     if role not in [
+
         "VIEWER",
-        "RECRUITER"
+
+        "RECRUITER",
+
+        "ADMIN"
+
     ]:
 
         raise HTTPException(
-            status_code=400,
+
+            status_code=
+                status.HTTP_400_BAD_REQUEST,
+
             detail=
-                "Role must be VIEWER or RECRUITER"
+                "Invalid role. Use VIEWER, RECRUITER or ADMIN"
+
         )
+
 
     try:
 
-        target_user_id = ObjectId(
+        object_id = ObjectId(
             user_id
         )
 
     except Exception:
 
         raise HTTPException(
-            status_code=400,
-            detail="Invalid user ID"
-        )
 
-    target_user = (
-        users_collection
-        .find_one(
-            {
-                "_id":
-                    target_user_id
-            }
-        )
-    )
+            status_code=
+                status.HTTP_400_BAD_REQUEST,
 
-    if not target_user:
-
-        raise HTTPException(
-            status_code=404,
-            detail="User not found"
-        )
-
-    if target_user.get(
-        "role"
-    ) == "ADMIN":
-
-        raise HTTPException(
-            status_code=400,
             detail=
-                "Administrator role cannot be changed"
+                "Invalid user ID"
+
         )
 
-    users_collection.update_one(
+
+    result = users_collection.update_one(
 
         {
             "_id":
-                target_user_id
+                object_id
         },
 
         {
             "$set": {
 
                 "role":
-                    role,
+                    role
 
-                "role_updated_at":
-                    datetime.now(
-                        timezone.utc
-                    ),
-
-                "role_updated_by":
-                    str(
-                        current_user["_id"]
-                    )
             }
         }
+
     )
+
+
+    if result.matched_count == 0:
+
+        raise HTTPException(
+
+            status_code=
+                status.HTTP_404_NOT_FOUND,
+
+            detail=
+                "User not found"
+
+        )
+
 
     return {
 
         "message":
             "User role updated successfully",
 
-        "user_id":
-            user_id,
-
         "role":
             role
+
     }
 
 
@@ -668,49 +634,41 @@ def change_user_role(
     "/users/{user_id}/activate"
 )
 def activate_user(
+
     user_id: str,
+
     current_user=Depends(
         require_roles(
             "ADMIN"
         )
     )
+
 ):
 
     try:
 
-        target_user_id = ObjectId(
+        object_id = ObjectId(
             user_id
         )
 
     except Exception:
 
         raise HTTPException(
-            status_code=400,
-            detail="Invalid user ID"
+
+            status_code=
+                status.HTTP_400_BAD_REQUEST,
+
+            detail=
+                "Invalid user ID"
+
         )
 
-    target_user = (
-        users_collection
-        .find_one(
-            {
-                "_id":
-                    target_user_id
-            }
-        )
-    )
 
-    if not target_user:
-
-        raise HTTPException(
-            status_code=404,
-            detail="User not found"
-        )
-
-    users_collection.update_one(
+    result = users_collection.update_one(
 
         {
             "_id":
-                target_user_id
+                object_id
         },
 
         {
@@ -720,31 +678,32 @@ def activate_user(
                     True,
 
                 "status":
-                    "ACTIVE",
+                    "ACTIVE"
 
-                "activated_at":
-                    datetime.now(
-                        timezone.utc
-                    ),
-
-                "activated_by":
-                    str(
-                        current_user["_id"]
-                    )
             }
         }
+
     )
+
+
+    if result.matched_count == 0:
+
+        raise HTTPException(
+
+            status_code=
+                status.HTTP_404_NOT_FOUND,
+
+            detail=
+                "User not found"
+
+        )
+
 
     return {
 
         "message":
-            "User activated successfully",
+            "User activated successfully"
 
-        "user_id":
-            user_id,
-
-        "status":
-            "ACTIVE"
     }
 
 
@@ -752,59 +711,41 @@ def activate_user(
     "/users/{user_id}/deactivate"
 )
 def deactivate_user(
+
     user_id: str,
+
     current_user=Depends(
         require_roles(
             "ADMIN"
         )
     )
+
 ):
 
     try:
 
-        target_user_id = ObjectId(
+        object_id = ObjectId(
             user_id
         )
 
     except Exception:
 
         raise HTTPException(
-            status_code=400,
-            detail="Invalid user ID"
-        )
 
-    target_user = (
-        users_collection
-        .find_one(
-            {
-                "_id":
-                    target_user_id
-            }
-        )
-    )
+            status_code=
+                status.HTTP_400_BAD_REQUEST,
 
-    if not target_user:
-
-        raise HTTPException(
-            status_code=404,
-            detail="User not found"
-        )
-
-    if target_user.get(
-        "role"
-    ) == "ADMIN":
-
-        raise HTTPException(
-            status_code=400,
             detail=
-                "Administrator account cannot be deactivated"
+                "Invalid user ID"
+
         )
 
-    users_collection.update_one(
+
+    result = users_collection.update_one(
 
         {
             "_id":
-                target_user_id
+                object_id
         },
 
         {
@@ -814,29 +755,30 @@ def deactivate_user(
                     False,
 
                 "status":
-                    "DISABLED",
+                    "DISABLED"
 
-                "deactivated_at":
-                    datetime.now(
-                        timezone.utc
-                    ),
-
-                "deactivated_by":
-                    str(
-                        current_user["_id"]
-                    )
             }
         }
+
     )
+
+
+    if result.matched_count == 0:
+
+        raise HTTPException(
+
+            status_code=
+                status.HTTP_404_NOT_FOUND,
+
+            detail=
+                "User not found"
+
+        )
+
 
     return {
 
         "message":
-            "User deactivated successfully",
+            "User deactivated successfully"
 
-        "user_id":
-            user_id,
-
-        "status":
-            "DISABLED"
     }

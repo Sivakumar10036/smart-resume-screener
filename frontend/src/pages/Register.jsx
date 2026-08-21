@@ -2,7 +2,6 @@ import {
     useState
 } from "react";
 
-
 import {
     registerUser
 } from "../services/api";
@@ -65,13 +64,39 @@ function Register({
         setSuccess(false);
 
 
-        if (
-            password !==
-            confirmPassword
-        ) {
+        const cleanUsername =
+            username.trim();
+
+        const cleanEmail =
+            email.trim().toLowerCase();
+
+
+        if (!cleanUsername) {
 
             setError(
-                "Passwords do not match"
+                "Username is required."
+            );
+
+            return;
+
+        }
+
+
+        if (!cleanEmail) {
+
+            setError(
+                "Email is required."
+            );
+
+            return;
+
+        }
+
+
+        if (password.length < 6) {
+
+            setError(
+                "Password must contain at least 6 characters."
             );
 
             return;
@@ -80,11 +105,12 @@ function Register({
 
 
         if (
-            password.length < 6
+            password !==
+            confirmPassword
         ) {
 
             setError(
-                "Password must contain at least 6 characters"
+                "Passwords do not match."
             );
 
             return;
@@ -97,21 +123,25 @@ function Register({
 
         try {
 
-            await registerUser({
+            const response =
+                await registerUser({
 
-                username:
-                    username.trim(),
+                    username:
+                        cleanUsername,
 
-                email:
-                    email.trim(),
+                    email:
+                        cleanEmail,
 
-                password:
-                    password
+                    password:
+                        password
 
-            });
+                });
 
 
-            setSuccess(true);
+            console.log(
+                "Registration successful:",
+                response
+            );
 
 
             setUsername("");
@@ -122,6 +152,7 @@ function Register({
 
             setConfirmPassword("");
 
+            setSuccess(true);
 
         } catch (
             registrationError
@@ -133,16 +164,42 @@ function Register({
             );
 
 
-            setError(
-
+            const serverMessage =
                 registrationError
                     ?.response
                     ?.data
-                    ?.detail
-                ||
-                "Registration failed"
+                    ?.detail;
 
-            );
+
+            if (
+                registrationError
+                    ?.response
+                    ?.status === 400
+            ) {
+
+                setError(
+                    serverMessage ||
+                    "Username or email already exists."
+                );
+
+            } else if (
+                registrationError
+                    ?.response
+                    ?.status >= 500
+            ) {
+
+                setError(
+                    "Server error. Please try again later."
+                );
+
+            } else {
+
+                setError(
+                    serverMessage ||
+                    "Registration failed. Please try again."
+                );
+
+            }
 
         } finally {
 
@@ -168,7 +225,7 @@ function Register({
                         </h1>
 
                         <p>
-                            Your account has been created.
+                            Your account is ready to use.
                         </p>
 
                     </div>
@@ -177,41 +234,71 @@ function Register({
                     <div className="success-message">
 
                         <strong>
-                            Account created successfully.
+                            Account created successfully!
                         </strong>
 
+
                         <br />
                         <br />
 
-                        Your account is currently
+
+                        Your account has been created
+                        with
+
+
                         <strong>
-                            {" PENDING "}
+                            {" VIEWER "}
                         </strong>
-                        administrator approval.
+
+
+                        access.
+
 
                         <br />
                         <br />
 
-                        You will be able to login
-                        after an administrator
-                        approves your account.
+
+                        You can login immediately.
+                        No administrator approval is
+                        required.
+
+
+                        <br />
+                        <br />
+
+
+                        <strong>
+                            Viewer access:
+                        </strong>
+
+
+                        <br />
+
+
+                        You can view your own
+                        screening scores for jobs
+                        associated with your account.
+
+
+                        <br />
+
+
+                        You cannot view other
+                        candidates' resumes or
+                        screening information.
 
                     </div>
 
 
                     <button
-
                         type="button"
-
                         className="primary-button login-button"
-
                         onClick={
                             onGoToLogin
                         }
-
                     >
 
-                        Back to Login
+                        Go to Login
 
                     </button>
 
@@ -278,6 +365,7 @@ function Register({
                                     )
                             }
                             placeholder="Enter username"
+                            autoComplete="username"
                             required
                         />
 
@@ -302,6 +390,7 @@ function Register({
                                     )
                             }
                             placeholder="Enter email"
+                            autoComplete="email"
                             required
                         />
 
@@ -326,6 +415,7 @@ function Register({
                                     )
                             }
                             placeholder="Enter password"
+                            autoComplete="new-password"
                             required
                         />
 
@@ -350,6 +440,7 @@ function Register({
                                     )
                             }
                             placeholder="Confirm password"
+                            autoComplete="new-password"
                             required
                         />
 

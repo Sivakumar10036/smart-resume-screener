@@ -1,4 +1,4 @@
-import React, {
+import {
     useState
 } from "react";
 
@@ -26,8 +26,8 @@ import {
 } from "./context/AuthContext";
 
 
-function AppContent() {
-
+function AppContent()
+{
     const {
         isAuthenticated,
         user
@@ -50,38 +50,29 @@ function AppContent() {
     );
 
 
-    if (
-        !isAuthenticated
-    ) {
-
+    if (!isAuthenticated)
+    {
         if (
             authPage ===
             "register"
-        ) {
-
+        )
+        {
             return (
-
                 <Register
-
                     onGoToLogin={() =>
                         setAuthPage(
                             "login"
                         )
                     }
-
                 />
-
             );
-
         }
 
 
         return (
-
             <Login
-
-                onLoginSuccess={() => {
-
+                onLoginSuccess={() =>
+                {
                     setCurrentPage(
                         "dashboard"
                     );
@@ -89,34 +80,36 @@ function AppContent() {
                     setAuthPage(
                         "login"
                     );
-
                 }}
-
                 onGoToRegister={() =>
                     setAuthPage(
                         "register"
                     )
                 }
-
             />
-
         );
-
     }
 
 
+    const userRole =
+        String(
+            user?.role ||
+            "VIEWER"
+        ).toUpperCase();
+
+
     const isAdmin =
-        user?.role ===
+        userRole ===
         "ADMIN";
 
 
     const isRecruiter =
-        user?.role ===
+        userRole ===
         "RECRUITER";
 
 
     const isViewer =
-        user?.role ===
+        userRole ===
         "VIEWER";
 
 
@@ -125,62 +118,68 @@ function AppContent() {
         isRecruiter;
 
 
-    const renderPage = () => {
+    const canUploadResume =
+        isAdmin ||
+        isRecruiter ||
+        isViewer;
 
 
+    const canViewResults =
+        isAdmin ||
+        isRecruiter ||
+        isViewer;
+
+
+    const renderPage = () =>
+    {
         if (
             currentPage ===
             "dashboard"
-        ) {
-
+        )
+        {
             return (
                 <Dashboard />
             );
-
         }
 
 
         if (
             currentPage ===
             "upload"
-        ) {
-
+        )
+        {
             if (
-                !canManageCandidates
-            ) {
-
+                !canUploadResume
+            )
+            {
                 return (
                     <Dashboard />
                 );
-
             }
 
 
             return (
                 <UploadResume />
             );
-
         }
 
 
         if (
             currentPage ===
             "job"
-        ) {
-
+        )
+        {
             if (
                 !canManageCandidates
-            ) {
-
+            )
+            {
                 return (
                     <Dashboard />
                 );
-
             }
 
 
             return (
-
                 <div className="page-container">
 
                     <div className="page-header">
@@ -188,7 +187,6 @@ function AppContent() {
                         <h1>
                             Job Description
                         </h1>
-
 
                         <p>
                             Create a job for
@@ -201,116 +199,96 @@ function AppContent() {
                     <JobDescription />
 
                 </div>
-
             );
-
         }
 
 
         if (
             currentPage ===
             "results"
-        ) {
-
+        )
+        {
             if (
-                !canManageCandidates
-            ) {
-
+                !canViewResults
+            )
+            {
                 return (
                     <Dashboard />
                 );
-
             }
 
 
             return (
                 <ScreeningResults />
             );
-
         }
 
 
         if (
             currentPage ===
             "admin"
-        ) {
-
+        )
+        {
             if (
                 !isAdmin
-            ) {
-
+            )
+            {
                 return (
                     <Dashboard />
                 );
-
             }
 
 
             return (
                 <AdminAccess />
             );
-
         }
 
 
         return (
             <Dashboard />
         );
-
     };
 
 
     return (
-
         <div className="app">
 
             <Navbar />
 
-
             <div className="app-body">
 
                 <Sidebar
-
                     currentPage={
                         currentPage
                     }
-
                     setCurrentPage={
                         setCurrentPage
                     }
-
                 />
-
 
                 <main
                     className="main-content"
                 >
-
                     {renderPage()}
-
                 </main>
 
             </div>
 
         </div>
-
     );
-
 }
 
 
-function App() {
-
+function App()
+{
     return (
-
         <AuthProvider>
 
             <AppContent />
 
         </AuthProvider>
-
     );
-
 }
 
 

@@ -99,57 +99,90 @@ Evaluate the candidate objectively based on:
 5. Overall suitability
 
 
+Scoring:
+
+Technical skills = 40%
+
+Relevant experience = 25%
+
+Education = 15%
+
+Job responsibilities = 10%
+
+Overall suitability = 10%
+
+
 Important rules:
 
-- Give a score from 1 to 10.
+- Give the match score from 0 to 100.
+- The match score is a percentage.
+- Do not give a score from 1 to 10.
+- Do not multiply or divide the score.
 - Do not invent candidate skills.
 - Do not invent candidate experience.
 - Do not assume experience that is not present.
-- matched_skills must contain only skills supported by the candidate.
+- matched_skills must contain only skills demonstrated by the candidate.
 - missing_skills must contain important job skills that the candidate does not demonstrate.
-- strengths must describe actual strengths found in the candidate data.
-- justification must explain why the candidate received the score.
+- strengths must contain only actual strengths found in the candidate data.
+- justification must explain the score.
 - Compare the candidate only against the provided job.
 - Be objective and consistent.
+- A candidate with only one or two matching skills must not automatically receive a high score.
 
 
-Scoring guidance:
+Score interpretation:
 
-9.0 - 10.0 = Excellent match
+90 - 100 = Excellent match
 
-7.0 - 8.9 = Strong match
+75 - 89 = Strong match
 
-5.0 - 6.9 = Moderate match
+60 - 74 = Moderate match
 
-1.0 - 4.9 = Weak match
+40 - 59 = Weak match
+
+0 - 39 = Very weak match
 
 
-Return only the requested structured JSON.
+Return only the requested JSON.
 """
 
 
     system_instruction = """
 You are an expert technical recruiter.
 
-Evaluate candidates objectively against
-job descriptions.
+Evaluate the candidate only using the
+candidate information and job information
+provided.
 
 Never invent information.
 
-Use only the candidate information
-and job information provided.
+The match_score MUST be a number between
+0 and 100.
 
-Return a structured screening result.
+The match_score represents a percentage.
 
-The match score must be between
-1 and 10.
+Examples:
 
-matched_skills must only contain
-skills demonstrated by the candidate.
+95 means 95 percent.
 
-missing_skills must only contain
-important job requirements that the
-candidate does not demonstrate.
+82 means 82 percent.
+
+67 means 67 percent.
+
+43 means 43 percent.
+
+20 means 20 percent.
+
+Never return a score using a 1 to 10 scale.
+
+matched_skills must contain only skills
+demonstrated by the candidate.
+
+missing_skills must contain only important
+job requirements that the candidate does
+not demonstrate.
+
+Return valid structured JSON only.
 """
 
 
@@ -164,8 +197,10 @@ candidate does not demonstrate.
 
         config={
             "temperature": 0,
+
             "response_mime_type":
                 "application/json",
+
             "response_schema":
                 ScreeningResult.model_json_schema()
         }
@@ -186,4 +221,30 @@ candidate does not demonstrate.
     )
 
 
-    return screening_result.model_dump()
+    result = screening_result.model_dump()
+
+
+    score = float(
+        result.get(
+            "match_score",
+            0
+        )
+    )
+
+
+    score = max(
+        0,
+        min(
+            score,
+            100
+        )
+    )
+
+
+    result["match_score"] = round(
+        score,
+        1
+    )
+
+
+    return result

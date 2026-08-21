@@ -9,8 +9,6 @@ class RegisterRequest(BaseModel):
 
     password: str
 
-    role: str = "VIEWER"
-
 
 class LoginResponse(BaseModel):
 
@@ -31,16 +29,6 @@ class UserResponse(BaseModel):
 
     role: str
 
+    status: str
+
     is_active: bool
-    
-    
-from pydantic import BaseModel, EmailStr
-
-
-class RegisterRequest(BaseModel):
-
-    username: str
-
-    email: EmailStr
-
-    password: str

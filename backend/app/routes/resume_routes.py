@@ -10,23 +10,16 @@ from fastapi import (
     UploadFile
 )
 
-from app.database import (
-    candidates_collection
-)
+from app.database import candidates_collection
 
-from app.services.file_extractor import (
-    extract_resume_text
-)
+from app.services.file_extractor import extract_resume_text
 
-from app.services.llm_service import (
-    extract_resume_information
-)
+from app.services.llm_service import extract_resume_information
 
-from app.services.job_parser import (
-    normalize_skills
-)
+from app.services.job_parser import normalize_skills
 
 from app.utils.security import (
+    get_current_user,
     require_roles
 )
 
@@ -37,16 +30,83 @@ router = APIRouter(
 )
 
 
+def candidate_belongs_to_user(
+    candidate,
+    current_user
+):
+
+    current_user_id = str(
+        current_user["_id"]
+    )
+
+    owner_id = candidate.get(
+        "owner_id"
+    )
+
+    uploaded_by = candidate.get(
+        "uploaded_by"
+    )
+
+    if owner_id is not None:
+
+        if str(owner_id) == current_user_id:
+
+            return True
+
+    if uploaded_by is not None:
+
+        if str(uploaded_by) == current_user_id:
+
+            return True
+
+    return False
+
+
+def convert_candidate_ids(
+    candidate
+):
+
+    candidate["_id"] = str(
+        candidate["_id"]
+    )
+
+    if "owner_id" in candidate:
+
+        candidate["owner_id"] = str(
+            candidate["owner_id"]
+        )
+
+    return candidate
+
+
 @router.post("/upload")
 async def upload_resume(
+
     file: UploadFile = File(...),
+
     current_user=Depends(
-        require_roles(
-            "ADMIN",
-            "RECRUITER"
-        )
+        get_current_user
     )
+
 ):
+
+    user_role = str(
+        current_user.get(
+            "role",
+            "VIEWER"
+        )
+    ).upper()
+
+    if user_role not in [
+        "VIEWER",
+        "RECRUITER",
+        "ADMIN"
+    ]:
+
+        raise HTTPException(
+            status_code=403,
+            detail="You do not have permission to upload resumes"
+        )
 
     if not file.filename:
 
@@ -104,7 +164,24 @@ async def upload_resume(
         )
     )
 
+    current_user_id = (
+        current_user["_id"]
+    )
+
+    current_user_id_string = str(
+        current_user_id
+    )
+
     candidate = {
+
+        "owner_id":
+            current_user_id,
+
+        "owner_username":
+            current_user.get(
+                "username",
+                ""
+            ),
 
         "name":
             candidate_profile.get(
@@ -152,9 +229,7 @@ async def upload_resume(
             resume_text,
 
         "uploaded_by":
-            str(
-                current_user["_id"]
-            ),
+            current_user_id_string,
 
         "uploaded_by_username":
             current_user.get(
@@ -163,15 +238,13 @@ async def upload_resume(
             ),
 
         "uploaded_by_role":
-            current_user.get(
-                "role",
-                ""
-            ),
+            user_role,
 
         "created_at":
             datetime.now(
                 timezone.utc
             )
+
     }
 
     result = (
@@ -204,80 +277,175 @@ async def upload_resume(
             ),
 
         "uploaded_by_role":
-            current_user.get(
-                "role",
-                ""
+            user_role,
+
+        "owner_id":
+            current_user_id_string
+
+    }
+
+
+@router.get("/my-resume")
+def get_my_resume(
+
+    current_user=Depends(
+        get_current_user
+    )
+
+):
+
+    current_user_id = str(
+        current_user["_id"]
+    )
+
+    candidates = list(
+
+        candidates_collection.find(
+
+            {
+                "$or": [
+
+                    {
+                        "owner_id":
+                            current_user["_id"]
+                    },
+
+                    {
+                        "owner_id":
+                            current_user_id
+                    },
+
+                    {
+                        "uploaded_by":
+                            current_user_id
+                    }
+
+                ]
+            },
+
+            {
+                "raw_text": 0
+            }
+
+        ).sort(
+
+            "created_at",
+            -1
+
+        )
+
+    )
+
+    if not candidates:
+
+        return {
+
+            "has_resume":
+                False,
+
+            "total":
+                0,
+
+            "candidates":
+                []
+
+        }
+
+    converted_candidates = []
+
+    for candidate in candidates:
+
+        converted_candidates.append(
+            convert_candidate_ids(
+                candidate
             )
+        )
+
+    return {
+
+        "has_resume":
+            True,
+
+        "total":
+            len(
+                converted_candidates
+            ),
+
+        "candidates":
+            converted_candidates
+
     }
 
 
 @router.get("/")
 def get_candidates(
+
     current_user=Depends(
         require_roles(
             "ADMIN",
             "RECRUITER"
         )
     )
+
 ):
 
     candidates = list(
 
-        candidates_collection
-        .find(
+        candidates_collection.find(
+
             {},
+
             {
                 "raw_text": 0
             }
-        )
-        .sort(
+
+        ).sort(
+
             "created_at",
             -1
+
         )
+
     )
+
+    converted_candidates = []
 
     for candidate in candidates:
 
-        candidate["_id"] = str(
-            candidate["_id"]
+        converted_candidates.append(
+            convert_candidate_ids(
+                candidate
+            )
         )
 
     return {
 
         "total":
-            len(candidates),
+            len(
+                converted_candidates
+            ),
 
         "candidates":
-            candidates
+            converted_candidates
+
     }
 
 
-@router.get("/{candidate_id}")
-def get_candidate(
+@router.get("/my/{candidate_id}")
+def get_my_candidate(
+
     candidate_id: str,
+
     current_user=Depends(
-        require_roles(
-            "ADMIN",
-            "RECRUITER"
-        )
+        get_current_user
     )
+
 ):
 
     try:
 
-        candidate = (
-            candidates_collection
-            .find_one(
-                {
-                    "_id":
-                        ObjectId(
-                            candidate_id
-                        )
-                },
-                {
-                    "raw_text": 0
-                }
-            )
+        object_id = ObjectId(
+            candidate_id
         )
 
     except Exception:
@@ -287,6 +455,24 @@ def get_candidate(
             detail="Invalid candidate ID"
         )
 
+    candidate = (
+
+        candidates_collection
+        .find_one(
+
+            {
+                "_id":
+                    object_id
+            },
+
+            {
+                "raw_text": 0
+            }
+
+        )
+
+    )
+
     if not candidate:
 
         raise HTTPException(
@@ -294,8 +480,99 @@ def get_candidate(
             detail="Candidate not found"
         )
 
-    candidate["_id"] = str(
-        candidate["_id"]
+    if not candidate_belongs_to_user(
+        candidate,
+        current_user
+    ):
+
+        raise HTTPException(
+            status_code=403,
+            detail="You can only view your own resume"
+        )
+
+    return convert_candidate_ids(
+        candidate
     )
 
-    return candidate
+
+@router.get("/{candidate_id}")
+def get_candidate(
+
+    candidate_id: str,
+
+    current_user=Depends(
+        get_current_user
+    )
+
+):
+
+    user_role = str(
+        current_user.get(
+            "role",
+            "VIEWER"
+        )
+    ).upper()
+
+    try:
+
+        object_id = ObjectId(
+            candidate_id
+        )
+
+    except Exception:
+
+        raise HTTPException(
+            status_code=400,
+            detail="Invalid candidate ID"
+        )
+
+    candidate = (
+
+        candidates_collection
+        .find_one(
+
+            {
+                "_id":
+                    object_id
+            },
+
+            {
+                "raw_text": 0
+            }
+
+        )
+
+    )
+
+    if not candidate:
+
+        raise HTTPException(
+            status_code=404,
+            detail="Candidate not found"
+        )
+
+    if user_role == "VIEWER":
+
+        if not candidate_belongs_to_user(
+            candidate,
+            current_user
+        ):
+
+            raise HTTPException(
+                status_code=403,
+                detail="You can only view your own resume"
+            )
+
+    elif user_role not in [
+        "ADMIN",
+        "RECRUITER"
+    ]:
+
+        raise HTTPException(
+            status_code=403,
+            detail="Access denied"
+        )
+
+    return convert_candidate_ids(
+        candidate
+    )

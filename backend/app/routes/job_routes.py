@@ -21,6 +21,7 @@ from app.services.job_parser import (
 )
 
 from app.utils.security import (
+    get_current_user,
     require_roles
 )
 
@@ -79,7 +80,10 @@ def create_job(
         "created_at":
             datetime.now(
                 timezone.utc
-            )
+            ),
+
+        "is_active":
+            True
     }
 
     result = (
@@ -110,10 +114,7 @@ def create_job(
 @router.get("/")
 def get_jobs(
     current_user=Depends(
-        require_roles(
-            "ADMIN",
-            "RECRUITER"
-        )
+        get_current_user
     )
 ):
 
@@ -121,7 +122,13 @@ def get_jobs(
 
         jobs_collection
         .find(
-            {},
+            {
+                "is_active":
+                    {
+                        "$ne":
+                            False
+                    }
+            },
             {
                 "description": 1,
                 "title": 1,
@@ -129,7 +136,8 @@ def get_jobs(
                 "created_at": 1,
                 "created_by": 1,
                 "created_by_username": 1,
-                "created_by_role": 1
+                "created_by_role": 1,
+                "is_active": 1
             }
         )
         .sort(
@@ -158,10 +166,7 @@ def get_jobs(
 def get_job(
     job_id: str,
     current_user=Depends(
-        require_roles(
-            "ADMIN",
-            "RECRUITER"
-        )
+        get_current_user
     )
 ):
 
@@ -174,7 +179,13 @@ def get_job(
                     "_id":
                         ObjectId(
                             job_id
-                        )
+                        ),
+
+                    "is_active":
+                        {
+                            "$ne":
+                                False
+                        }
                 }
             )
         )
@@ -332,15 +343,35 @@ def delete_job(
 
     result = (
         jobs_collection
-        .delete_one(
+        .update_one(
+
             {
                 "_id":
                     object_id
+            },
+
+            {
+                "$set": {
+
+                    "is_active":
+                        False,
+
+                    "deleted_at":
+                        datetime.now(
+                            timezone.utc
+                        ),
+
+                    "deleted_by":
+                        str(
+                            current_user["_id"]
+                        )
+
+                }
             }
         )
     )
 
-    if result.deleted_count == 0:
+    if result.matched_count == 0:
 
         raise HTTPException(
             status_code=404,

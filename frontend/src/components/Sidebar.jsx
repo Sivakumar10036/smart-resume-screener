@@ -1,6 +1,8 @@
 import React from "react";
 
-import { useAuth } from "../context/AuthContext";
+import {
+    useAuth
+} from "../context/AuthContext";
 
 
 function Sidebar({
@@ -14,14 +16,31 @@ function Sidebar({
 
 
     const role =
-        user?.role?.toUpperCase();
+        String(
+            user?.role ||
+            "VIEWER"
+        ).toUpperCase();
+
+
+    const isAdmin =
+        role === "ADMIN";
+
+
+    const isRecruiter =
+        role === "RECRUITER";
+
+
+    const isViewer =
+        role === "VIEWER";
 
 
     const goToPage = (
         page
     ) => {
 
-        setCurrentPage(page);
+        setCurrentPage(
+            page
+        );
 
     };
 
@@ -33,7 +52,9 @@ function Sidebar({
             <div className="sidebar-header">
 
                 <span className="sidebar-label">
+
                     NAVIGATION
+
                 </span>
 
             </div>
@@ -59,15 +80,18 @@ function Sidebar({
                 >
 
                     <span className="sidebar-item-text">
+
                         Dashboard
+
                     </span>
 
                 </button>
 
 
                 {(
-                    role === "ADMIN" ||
-                    role === "RECRUITER"
+                    isViewer ||
+                    isRecruiter ||
+                    isAdmin
                 ) && (
 
                     <button
@@ -88,7 +112,12 @@ function Sidebar({
                     >
 
                         <span className="sidebar-item-text">
-                            Upload Resumes
+
+                            {isViewer
+                                ? "Upload My Resume"
+                                : "Upload Resumes"
+                            }
+
                         </span>
 
                     </button>
@@ -97,8 +126,8 @@ function Sidebar({
 
 
                 {(
-                    role === "ADMIN" ||
-                    role === "RECRUITER"
+                    isRecruiter ||
+                    isAdmin
                 ) && (
 
                     <button
@@ -119,7 +148,9 @@ function Sidebar({
                     >
 
                         <span className="sidebar-item-text">
+
                             Job Description
+
                         </span>
 
                     </button>
@@ -128,8 +159,9 @@ function Sidebar({
 
 
                 {(
-                    role === "ADMIN" ||
-                    role === "RECRUITER"
+                    isViewer ||
+                    isRecruiter ||
+                    isAdmin
                 ) && (
 
                     <button
@@ -150,7 +182,12 @@ function Sidebar({
                     >
 
                         <span className="sidebar-item-text">
-                            Screening Results
+
+                            {isViewer
+                                ? "My Screening Results"
+                                : "Screening Results"
+                            }
+
                         </span>
 
                     </button>
@@ -160,7 +197,7 @@ function Sidebar({
             </nav>
 
 
-            {role === "ADMIN" && (
+            {isAdmin && (
 
                 <div className="sidebar-admin-section">
 
@@ -168,7 +205,9 @@ function Sidebar({
 
 
                     <span className="sidebar-admin-label">
+
                         ADMINISTRATION
+
                     </span>
 
 
@@ -190,7 +229,9 @@ function Sidebar({
                     >
 
                         <span className="sidebar-item-text">
+
                             Admin Access
+
                         </span>
 
                     </button>

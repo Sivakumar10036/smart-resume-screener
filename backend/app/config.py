@@ -29,14 +29,14 @@ class Settings:
     shortlist_threshold = float(
         os.getenv(
             "SHORTLIST_THRESHOLD",
-            "8.0"
+            "75"
         )
     )
 
     review_threshold = float(
         os.getenv(
             "REVIEW_THRESHOLD",
-            "6.0"
+            "55"
         )
     )
 

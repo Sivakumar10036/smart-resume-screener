@@ -4,12 +4,20 @@ import {
     uploadResume
 } from "../services/api";
 
+import {
+    useAuth
+} from "../context/AuthContext";
+
 import Loading from "./Loading";
 
 
 function ResumeUpload({
     onUploadSuccess
 }) {
+
+    const {
+        user
+    } = useAuth();
 
     const [
         selectedFile,
@@ -32,12 +40,17 @@ function ResumeUpload({
     ] = useState(false);
 
 
+    const role = String(
+        user?.role || "VIEWER"
+    ).toUpperCase();
+
+
     const handleFileChange = (
         event
     ) => {
 
         const file =
-            event.target.files[0];
+            event.target.files?.[0];
 
         setError("");
         setResult(null);
@@ -52,10 +65,11 @@ function ResumeUpload({
         const fileName =
             file.name.toLowerCase();
 
-        if (
-            !fileName.endsWith(".pdf") &&
-            !fileName.endsWith(".txt")
-        ) {
+        const validFile =
+            fileName.endsWith(".pdf") ||
+            fileName.endsWith(".txt");
+
+        if (!validFile) {
 
             setSelectedFile(null);
 
@@ -81,10 +95,11 @@ function ResumeUpload({
             return;
         }
 
-        try {
+        setLoading(true);
+        setError("");
+        setResult(null);
 
-            setLoading(true);
-            setError("");
+        try {
 
             const data =
                 await uploadResume(
@@ -95,107 +110,199 @@ function ResumeUpload({
 
             setSelectedFile(null);
 
+            const fileInput =
+                document.getElementById(
+                    "resume-file-input"
+                );
+
+            if (fileInput) {
+
+                fileInput.value = "";
+
+            }
+
             if (onUploadSuccess) {
 
                 onUploadSuccess(data);
+
             }
 
         } catch (uploadError) {
 
-            setError(
+            console.error(
+                "Resume upload error:",
+                uploadError
+            );
+
+            const serverMessage =
                 uploadError
                     ?.response
                     ?.data
-                    ?.detail
-                ||
-                "Resume upload failed."
+                    ?.detail;
+
+            setError(
+                serverMessage ||
+                "Resume upload failed. Please try again."
             );
 
         } finally {
 
             setLoading(false);
+
         }
     };
 
 
     return (
+
         <div className="upload-card">
 
-            <h2>
-                Upload Resume
-            </h2>
+            <div className="upload-header">
 
-            <p>
-                Supported formats: PDF, TXT
-            </p>
+                <div>
 
-            <input
-                type="file"
-                accept=".pdf,.txt"
-                onChange={
-                    handleFileChange
-                }
-            />
+                    <h2>
+                        Upload My Resume
+                    </h2>
 
-            {selectedFile && (
-
-                <div className="selected-file">
-
-                    Selected:
-                    {" "}
-                    {selectedFile.name}
+                    <p>
+                        Upload your resume to receive
+                        AI-powered job matching scores.
+                    </p>
 
                 </div>
 
-            )}
+            </div>
 
 
-            {error && (
+            <div className="upload-area">
 
-                <div className="error-message">
-                    {error}
+                <div className="upload-icon">
+                    📄
                 </div>
 
-            )}
+                <h3>
+                    Choose your resume
+                </h3>
+
+                <p>
+                    PDF or TXT files only
+                </p>
 
 
-            {loading ? (
-
-                <Loading
-                    message="Parsing resume with AI..."
+                <input
+                    id="resume-file-input"
+                    type="file"
+                    accept=".pdf,.txt"
+                    onChange={
+                        handleFileChange
+                    }
+                    disabled={
+                        loading
+                    }
+                    hidden
                 />
 
-            ) : (
 
-                <button
-                    className="primary-button"
-                    onClick={
-                        handleUpload
-                    }
+                <label
+                    htmlFor="resume-file-input"
+                    className="secondary-button"
                 >
-                    Upload Resume
-                </button>
+                    Choose File
+                </label>
 
-            )}
+
+                {selectedFile && (
+
+                    <div className="selected-file">
+
+                        <span>
+                            Selected file:
+                        </span>
+
+                        <strong>
+                            {selectedFile.name}
+                        </strong>
+
+                    </div>
+
+                )}
+
+
+                {error && (
+
+                    <div className="error-message">
+
+                        {error}
+
+                    </div>
+
+                )}
+
+
+                {loading ? (
+
+                    <Loading
+                        message={
+                            "Parsing resume with AI..."
+                        }
+                    />
+
+                ) : (
+
+                    <button
+                        type="button"
+                        className="primary-button"
+                        onClick={
+                            handleUpload
+                        }
+                        disabled={
+                            !selectedFile
+                        }
+                    >
+                        Upload Resume
+                    </button>
+
+                )}
+
+            </div>
 
 
             {result && (
 
                 <div className="success-message">
 
-                    Resume processed successfully.
+                    <strong>
+                        Resume uploaded successfully!
+                    </strong>
 
-                    <br />
+                    <p>
+                        Candidate:{" "}
+                        {result.candidate?.name ||
+                            "Candidate"}
+                    </p>
 
-                    Candidate:
-                    {" "}
-                    {result.candidate?.name}
+                    <p>
+                        Your resume has been
+                        saved to your account.
+                    </p>
+
+                    <p>
+                        Go to
+                        {" "}
+                        <strong>
+                            My Screening Results
+                        </strong>
+                        {" "}
+                        to view your scores.
+                    </p>
 
                 </div>
 
             )}
 
         </div>
+
     );
 }
 

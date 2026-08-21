@@ -2,11 +2,9 @@ import {
     useState
 } from "react";
 
-
 import {
     useAuth
 } from "../context/AuthContext";
-
 
 import {
     loginUser
@@ -55,6 +53,31 @@ function Login({
 
         setError("");
 
+
+        const cleanUsername =
+            username.trim();
+
+
+        if (!cleanUsername) {
+
+            setError(
+                "Please enter your username."
+            );
+
+            return;
+        }
+
+
+        if (!password) {
+
+            setError(
+                "Please enter your password."
+            );
+
+            return;
+        }
+
+
         setLoading(true);
 
 
@@ -62,9 +85,21 @@ function Login({
 
             const data =
                 await loginUser(
-                    username,
+                    cleanUsername,
                     password
                 );
+
+
+            if (
+                !data ||
+                !data.access_token ||
+                !data.user
+            ) {
+
+                throw new Error(
+                    "Invalid login response from server."
+                );
+            }
 
 
             login(
@@ -77,7 +112,9 @@ function Login({
                 onLoginSuccess
             ) {
 
-                onLoginSuccess();
+                onLoginSuccess(
+                    data.user
+                );
 
             }
 
@@ -91,16 +128,59 @@ function Login({
             );
 
 
-            setError(
+            const statusCode =
+                loginError
+                    ?.response
+                    ?.status;
 
+
+            const serverMessage =
                 loginError
                     ?.response
                     ?.data
-                    ?.detail
-                ||
-                "Incorrect username or password"
+                    ?.detail;
 
-            );
+
+            if (
+                statusCode === 401
+            ) {
+
+                setError(
+                    "Invalid username or password."
+                );
+
+            } else if (
+                statusCode === 403
+            ) {
+
+                setError(
+                    serverMessage ||
+                    "Your account is disabled."
+                );
+
+            } else if (
+                statusCode >= 500
+            ) {
+
+                setError(
+                    "Server error. Please try again later."
+                );
+
+            } else if (
+                serverMessage
+            ) {
+
+                setError(
+                    serverMessage
+                );
+
+            } else {
+
+                setError(
+                    "Unable to login. Please check your username and password."
+                );
+
+            }
 
         } finally {
 
@@ -165,6 +245,7 @@ function Login({
                                     )
                             }
                             placeholder="Enter username"
+                            autoComplete="username"
                             required
                         />
 
@@ -189,6 +270,7 @@ function Login({
                                     )
                             }
                             placeholder="Enter password"
+                            autoComplete="current-password"
                             required
                         />
 
@@ -203,9 +285,10 @@ function Login({
                         }
                     >
 
-                        {loading
-                            ? "Logging in..."
-                            : "Login"
+                        {
+                            loading
+                                ? "Logging in..."
+                                : "Login"
                         }
 
                     </button>
@@ -226,7 +309,9 @@ function Login({
                             onGoToRegister
                         }
                     >
+
                         Create Account
+
                     </button>
 
                 </div>

@@ -3,17 +3,26 @@ import {
     useState
 } from "react";
 
+
 import {
     getUsers,
-    approveUser,
-    rejectUser,
     changeUserRole,
     activateUser,
     deactivateUser
 } from "../services/api";
 
 
+import {
+    useAuth
+} from "../context/AuthContext";
+
+
 function AdminAccess() {
+
+    const {
+        user: currentUser
+    } = useAuth();
+
 
     const [
         users,
@@ -41,32 +50,40 @@ function AdminAccess() {
 
     const loadUsers = async () => {
 
-        setLoading(true);
-
-        setError("");
-
         try {
+
+            setLoading(true);
+
+            setError("");
+
 
             const response =
                 await getUsers();
+
 
             setUsers(
                 response.users || []
             );
 
-        } catch (requestError) {
+        } catch (
+            requestError
+        ) {
 
             console.error(
+                "Unable to load users:",
                 requestError
             );
 
+
             setError(
+
                 requestError
                     ?.response
                     ?.data
                     ?.detail
                 ||
-                "Unable to load users"
+                "Unable to load users."
+
             );
 
         } finally {
@@ -85,53 +102,62 @@ function AdminAccess() {
     }, []);
 
 
-    const handleApprove = async (
-        userId
+    const handleRoleChange = async (
+        userId,
+        role
     ) => {
 
-        setActionLoading(
-            userId
-        );
+        const selectedRole =
+            String(
+                role
+            ).toUpperCase();
 
-        setError("");
 
-        try {
+        if (
+            selectedRole !== "VIEWER" &&
+            selectedRole !== "RECRUITER"
+        ) {
 
-            await approveUser(
-                userId
-            );
-
-            await loadUsers();
-
-        } catch (requestError) {
-
-            setError(
-                requestError
-                    ?.response
-                    ?.data
-                    ?.detail
-                ||
-                "Unable to approve user"
-            );
-
-        } finally {
-
-            setActionLoading(
-                null
-            );
+            return;
 
         }
 
-    };
+
+        const selectedUser =
+            users.find(
+                item =>
+                    item.id ===
+                    userId
+            );
 
 
-    const handleReject = async (
-        userId
-    ) => {
+        if (!selectedUser) {
+
+            return;
+
+        }
+
+
+        if (
+            selectedUser.role ===
+            selectedRole
+        ) {
+
+            return;
+
+        }
+
 
         const confirmed =
             window.confirm(
-                "Are you sure you want to reject this user?"
+
+                selectedRole ===
+                "RECRUITER"
+
+                    ? `Give recruiter access to ${selectedUser.username}?`
+
+                    : `Change ${selectedUser.username} back to Viewer?`
+
             );
 
 
@@ -146,67 +172,39 @@ function AdminAccess() {
             userId
         );
 
-        setError("");
-
-        try {
-
-            await rejectUser(
-                userId
-            );
-
-            await loadUsers();
-
-        } catch (requestError) {
-
-            setError(
-                requestError
-                    ?.response
-                    ?.data
-                    ?.detail
-                ||
-                "Unable to reject user"
-            );
-
-        } finally {
-
-            setActionLoading(
-                null
-            );
-
-        }
-
-    };
-
-
-    const handleRoleChange = async (
-        userId,
-        role
-    ) => {
-
-        setActionLoading(
-            userId
-        );
 
         setError("");
+
 
         try {
 
             await changeUserRole(
                 userId,
-                role
+                selectedRole
             );
+
 
             await loadUsers();
 
-        } catch (requestError) {
+        } catch (
+            requestError
+        ) {
+
+            console.error(
+                "Role change error:",
+                requestError
+            );
+
 
             setError(
+
                 requestError
                     ?.response
                     ?.data
                     ?.detail
                 ||
-                "Unable to change user role"
+                "Unable to change user role."
+
             );
 
         } finally {
@@ -228,7 +226,9 @@ function AdminAccess() {
             userId
         );
 
+
         setError("");
+
 
         try {
 
@@ -236,17 +236,28 @@ function AdminAccess() {
                 userId
             );
 
+
             await loadUsers();
 
-        } catch (requestError) {
+        } catch (
+            requestError
+        ) {
+
+            console.error(
+                "Activate user error:",
+                requestError
+            );
+
 
             setError(
+
                 requestError
                     ?.response
                     ?.data
                     ?.detail
                 ||
-                "Unable to activate user"
+                "Unable to activate user."
+
             );
 
         } finally {
@@ -264,9 +275,36 @@ function AdminAccess() {
         userId
     ) => {
 
+        const selectedUser =
+            users.find(
+                item =>
+                    item.id ===
+                    userId
+            );
+
+
+        if (!selectedUser) {
+
+            return;
+
+        }
+
+
+        if (
+            selectedUser.role ===
+            "ADMIN"
+        ) {
+
+            return;
+
+        }
+
+
         const confirmed =
             window.confirm(
-                "Are you sure you want to deactivate this user?"
+
+                `Deactivate ${selectedUser.username}?`
+
             );
 
 
@@ -281,7 +319,9 @@ function AdminAccess() {
             userId
         );
 
+
         setError("");
+
 
         try {
 
@@ -289,17 +329,28 @@ function AdminAccess() {
                 userId
             );
 
+
             await loadUsers();
 
-        } catch (requestError) {
+        } catch (
+            requestError
+        ) {
+
+            console.error(
+                "Deactivate user error:",
+                requestError
+            );
+
 
             setError(
+
                 requestError
                     ?.response
                     ?.data
                     ?.detail
                 ||
-                "Unable to deactivate user"
+                "Unable to deactivate user."
+
             );
 
         } finally {
@@ -317,92 +368,111 @@ function AdminAccess() {
         users.length;
 
 
-    const pendingUsers =
-        users.filter(
-            user =>
-                user.status ===
-                "PENDING"
-        ).length;
-
-
     const activeUsers =
         users.filter(
-            user =>
-                user.status ===
-                "ACTIVE"
+            item =>
+                item.is_active === true
         ).length;
 
 
-    const getStatusClass = (
-        status
-    ) => {
+    const disabledUsers =
+        users.filter(
+            item =>
+                item.is_active === false
+        ).length;
 
-        const normalizedStatus =
-            status
-                ?.toLowerCase();
 
-        if (
-            normalizedStatus ===
-            "active"
-        ) {
+    const viewerUsers =
+        users.filter(
+            item =>
+                String(
+                    item.role ||
+                    ""
+                ).toUpperCase() ===
+                "VIEWER"
+        ).length;
 
-            return "admin-status active";
 
-        }
+    const recruiterUsers =
+        users.filter(
+            item =>
+                String(
+                    item.role ||
+                    ""
+                ).toUpperCase() ===
+                "RECRUITER"
+        ).length;
 
-        if (
-            normalizedStatus ===
-            "pending"
-        ) {
 
-            return "admin-status pending";
-
-        }
-
-        if (
-            normalizedStatus ===
-            "rejected"
-        ) {
-
-            return "admin-status rejected";
-
-        }
-
-        if (
-            normalizedStatus ===
-            "disabled"
-        ) {
-
-            return "admin-status disabled";
-
-        }
-
-        return "admin-status unknown";
-
-    };
+    const adminUsers =
+        users.filter(
+            item =>
+                String(
+                    item.role ||
+                    ""
+                ).toUpperCase() ===
+                "ADMIN"
+        ).length;
 
 
     const getRoleClass = (
         role
     ) => {
 
+        const normalizedRole =
+            String(
+                role ||
+                "VIEWER"
+            ).toUpperCase();
+
+
         if (
-            role === "ADMIN"
+            normalizedRole ===
+            "ADMIN"
         ) {
 
             return "admin-role-badge admin";
 
         }
 
+
         if (
-            role === "RECRUITER"
+            normalizedRole ===
+            "RECRUITER"
         ) {
 
             return "admin-role-badge recruiter";
 
         }
 
+
         return "admin-role-badge viewer";
+
+    };
+
+
+    const getStatusClass = (
+        user
+    ) => {
+
+        return user.is_active === true
+
+            ? "admin-status active"
+
+            : "admin-status disabled";
+
+    };
+
+
+    const getStatusText = (
+        user
+    ) => {
+
+        return user.is_active === true
+
+            ? "ACTIVE"
+
+            : "DISABLED";
 
     };
 
@@ -419,9 +489,10 @@ function AdminAccess() {
                         Admin Access
                     </h1>
 
+
                     <p>
-                        Manage users, approvals,
-                        roles and account access.
+                        Manage users and
+                        recruiter access.
                     </p>
 
                 </div>
@@ -454,9 +525,10 @@ function AdminAccess() {
                     Admin Access
                 </h1>
 
+
                 <p>
-                    Manage users, approvals,
-                    roles and account access.
+                    Manage users and decide
+                    who can become a recruiter.
                 </p>
 
             </div>
@@ -473,6 +545,65 @@ function AdminAccess() {
             )}
 
 
+            <div className="admin-management-card">
+
+                <div
+                    style={{
+                        padding:
+                            "18px 20px",
+
+                        marginBottom:
+                            "20px",
+
+                        borderRadius:
+                            "10px",
+
+                        background:
+                            "#eff6ff",
+
+                        border:
+                            "1px solid #bfdbfe",
+
+                        color:
+                            "#1e40af"
+                    }}
+                >
+
+                    <strong>
+                        Access Management
+                    </strong>
+
+
+                    <p
+                        style={{
+                            margin:
+                                "8px 0 0"
+                        }}
+                    >
+
+                        New users automatically
+                        receive Viewer access.
+                        No administrator approval
+                        is required for registration.
+
+
+                        <br />
+                        <br />
+
+
+                        Use the Role dropdown to
+                        give a user Recruiter access.
+                        Recruiters can manage resumes,
+                        jobs, screening results and
+                        shortlist exports.
+
+                    </p>
+
+                </div>
+
+            </div>
+
+
             <div className="admin-stats">
 
                 <div className="admin-stat-card">
@@ -481,21 +612,9 @@ function AdminAccess() {
                         Total Users
                     </span>
 
+
                     <strong className="admin-stat-value">
                         {totalUsers}
-                    </strong>
-
-                </div>
-
-
-                <div className="admin-stat-card pending">
-
-                    <span className="admin-stat-label">
-                        Pending Approval
-                    </span>
-
-                    <strong className="admin-stat-value">
-                        {pendingUsers}
                     </strong>
 
                 </div>
@@ -507,8 +626,65 @@ function AdminAccess() {
                         Active Users
                     </span>
 
+
                     <strong className="admin-stat-value">
                         {activeUsers}
+                    </strong>
+
+                </div>
+
+
+                <div className="admin-stat-card">
+
+                    <span className="admin-stat-label">
+                        Viewers
+                    </span>
+
+
+                    <strong className="admin-stat-value">
+                        {viewerUsers}
+                    </strong>
+
+                </div>
+
+
+                <div className="admin-stat-card">
+
+                    <span className="admin-stat-label">
+                        Recruiters
+                    </span>
+
+
+                    <strong className="admin-stat-value">
+                        {recruiterUsers}
+                    </strong>
+
+                </div>
+
+
+                <div className="admin-stat-card">
+
+                    <span className="admin-stat-label">
+                        Admins
+                    </span>
+
+
+                    <strong className="admin-stat-value">
+                        {adminUsers}
+                    </strong>
+
+                </div>
+
+
+                <div className="admin-stat-card">
+
+                    <span className="admin-stat-label">
+                        Disabled
+                    </span>
+
+
+                    <strong className="admin-stat-value">
+                        {disabledUsers}
                     </strong>
 
                 </div>
@@ -526,24 +702,33 @@ function AdminAccess() {
                             User Management
                         </h2>
 
+
                         <p>
-                            Approve users and manage
-                            their access permissions.
+                            Assign or remove
+                            recruiter access.
                         </p>
 
                     </div>
 
 
                     <button
+
                         type="button"
+
                         className="admin-refresh-button"
-                        onClick={loadUsers}
-                        disabled={loading}
+
+                        onClick={
+                            loadUsers
+                        }
+
+                        disabled={
+                            loading ||
+                            actionLoading !== null
+                        }
+
                     >
 
-                        ↻
-
-                        Refresh
+                        ↻ Refresh
 
                     </button>
 
@@ -572,17 +757,21 @@ function AdminAccess() {
                                         Username
                                     </th>
 
+
                                     <th>
                                         Email
                                     </th>
+
 
                                     <th>
                                         Role
                                     </th>
 
+
                                     <th>
                                         Status
                                     </th>
+
 
                                     <th>
                                         Actions
@@ -596,11 +785,39 @@ function AdminAccess() {
                             <tbody>
 
                                 {users.map(
-                                    user => (
+                                    item => {
+
+                                    const normalizedRole =
+                                        String(
+                                            item.role ||
+                                            "VIEWER"
+                                        ).toUpperCase();
+
+
+                                    const isCurrentAdmin =
+                                        String(
+                                            item.id
+                                        ) ===
+                                        String(
+                                            currentUser?.id
+                                        );
+
+
+                                    const isAdmin =
+                                        normalizedRole ===
+                                        "ADMIN";
+
+
+                                    const isActive =
+                                        item.is_active ===
+                                        true;
+
+
+                                    return (
 
                                         <tr
                                             key={
-                                                user._id
+                                                item.id
                                             }
                                         >
 
@@ -608,7 +825,30 @@ function AdminAccess() {
 
                                                 <div className="admin-username">
 
-                                                    {user.username}
+                                                    {
+                                                        item.username
+                                                    }
+
+                                                    {isCurrentAdmin && (
+
+                                                        <span
+                                                            style={{
+                                                                marginLeft:
+                                                                    "8px",
+
+                                                                fontSize:
+                                                                    "12px",
+
+                                                                color:
+                                                                    "#64748b"
+                                                            }}
+                                                        >
+
+                                                            You
+
+                                                        </span>
+
+                                                    )}
 
                                                 </div>
 
@@ -619,7 +859,9 @@ function AdminAccess() {
 
                                                 <div className="admin-email">
 
-                                                    {user.email}
+                                                    {
+                                                        item.email
+                                                    }
 
                                                 </div>
 
@@ -628,51 +870,71 @@ function AdminAccess() {
 
                                             <td>
 
-                                                {user.role ===
-                                                "ADMIN" ? (
+                                                {isAdmin ? (
 
                                                     <span
                                                         className={
                                                             getRoleClass(
-                                                                user.role
+                                                                normalizedRole
                                                             )
                                                         }
                                                     >
+
                                                         ADMIN
+
                                                     </span>
 
                                                 ) : (
 
                                                     <select
+
                                                         className="admin-role-select"
+
                                                         value={
-                                                            user.role
+                                                            normalizedRole
                                                         }
+
                                                         disabled={
+
                                                             actionLoading ===
-                                                            user._id
+                                                            item.id
+
+                                                            ||
+
+                                                            !isActive
+
                                                         }
+
                                                         onChange={
                                                             event =>
                                                                 handleRoleChange(
-                                                                    user._id,
+
+                                                                    item.id,
+
                                                                     event
                                                                         .target
                                                                         .value
+
                                                                 )
                                                         }
+
                                                     >
 
                                                         <option
                                                             value="VIEWER"
                                                         >
+
                                                             VIEWER
+
                                                         </option>
+
 
                                                         <option
                                                             value="RECRUITER"
                                                         >
+
                                                             RECRUITER
+
                                                         </option>
 
                                                     </select>
@@ -687,14 +949,15 @@ function AdminAccess() {
                                                 <span
                                                     className={
                                                         getStatusClass(
-                                                            user.status
+                                                            item
                                                         )
                                                     }
                                                 >
 
                                                     {
-                                                        user.status ||
-                                                        "UNKNOWN"
+                                                        getStatusText(
+                                                            item
+                                                        )
                                                     }
 
                                                 </span>
@@ -706,130 +969,79 @@ function AdminAccess() {
 
                                                 <div className="admin-actions">
 
-                                                    {user.role !==
-                                                        "ADMIN" &&
-                                                        user.status ===
-                                                        "PENDING" && (
+                                                    {isAdmin ? (
 
-                                                            <>
+                                                        <span className="admin-role-badge admin">
 
-                                                                <button
-                                                                    type="button"
-                                                                    className="admin-action-button admin-approve"
-                                                                    disabled={
-                                                                        actionLoading ===
-                                                                        user._id
-                                                                    }
-                                                                    onClick={
-                                                                        () =>
-                                                                            handleApprove(
-                                                                                user._id
-                                                                            )
-                                                                    }
-                                                                >
+                                                            Protected
 
-                                                                    {actionLoading ===
-                                                                    user._id
-                                                                        ? "Processing..."
-                                                                        : "Approve"}
+                                                        </span>
 
-                                                                </button>
+                                                    ) : isActive ? (
 
+                                                        <button
 
-                                                                <button
-                                                                    type="button"
-                                                                    className="admin-action-button admin-reject"
-                                                                    disabled={
-                                                                        actionLoading ===
-                                                                        user._id
-                                                                    }
-                                                                    onClick={
-                                                                        () =>
-                                                                            handleReject(
-                                                                                user._id
-                                                                            )
-                                                                    }
-                                                                >
+                                                            type="button"
 
-                                                                    Reject
+                                                            className="admin-action-button admin-deactivate"
 
-                                                                </button>
+                                                            disabled={
+                                                                actionLoading ===
+                                                                item.id
+                                                            }
 
-                                                            </>
+                                                            onClick={() =>
+                                                                handleDeactivate(
+                                                                    item.id
+                                                                )
+                                                            }
 
-                                                        )}
+                                                        >
 
+                                                            {actionLoading ===
+                                                            item.id
 
-                                                    {user.role !==
-                                                        "ADMIN" &&
-                                                        user.status ===
-                                                        "ACTIVE" && (
+                                                                ? "Processing..."
 
-                                                            <button
-                                                                type="button"
-                                                                className="admin-action-button admin-deactivate"
-                                                                disabled={
-                                                                    actionLoading ===
-                                                                    user._id
-                                                                }
-                                                                onClick={
-                                                                    () =>
-                                                                        handleDeactivate(
-                                                                            user._id
-                                                                        )
-                                                                }
-                                                            >
+                                                                : "Deactivate"
 
-                                                                {actionLoading ===
-                                                                user._id
-                                                                    ? "Processing..."
-                                                                    : "Deactivate"}
+                                                            }
 
-                                                            </button>
+                                                        </button>
 
-                                                        )}
+                                                    ) : (
 
+                                                        <button
 
-                                                    {user.role !==
-                                                        "ADMIN" &&
-                                                        user.status ===
-                                                        "DISABLED" && (
+                                                            type="button"
 
-                                                            <button
-                                                                type="button"
-                                                                className="admin-action-button admin-activate"
-                                                                disabled={
-                                                                    actionLoading ===
-                                                                    user._id
-                                                                }
-                                                                onClick={
-                                                                    () =>
-                                                                        handleActivate(
-                                                                            user._id
-                                                                        )
-                                                                }
-                                                            >
+                                                            className="admin-action-button admin-activate"
 
-                                                                {actionLoading ===
-                                                                user._id
-                                                                    ? "Processing..."
-                                                                    : "Activate"}
+                                                            disabled={
+                                                                actionLoading ===
+                                                                item.id
+                                                            }
 
-                                                            </button>
+                                                            onClick={() =>
+                                                                handleActivate(
+                                                                    item.id
+                                                                )
+                                                            }
 
-                                                        )}
+                                                        >
 
+                                                            {actionLoading ===
+                                                            item.id
 
-                                                    {user.role ===
-                                                        "ADMIN" && (
+                                                                ? "Processing..."
 
-                                                            <span className="admin-role-badge admin">
+                                                                : "Activate"
 
-                                                                Protected
+                                                            }
 
-                                                            </span>
+                                                        </button>
 
-                                                        )}
+                                                    )}
 
                                                 </div>
 
@@ -837,8 +1049,9 @@ function AdminAccess() {
 
                                         </tr>
 
-                                    )
-                                )}
+                                    );
+
+                                })}
 
                             </tbody>
 
