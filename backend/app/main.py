@@ -35,19 +35,21 @@ app = FastAPI(
 )
 
 
-frontend_url = os.getenv(
-    "FRONTEND_URL",
-    ""
-).strip()
-
-
 allowed_origins = [
     "http://localhost:5173",
-    "http://127.0.0.1:5173"
+    "http://127.0.0.1:5173",
+    "https://smart-resume-screener-nine.vercel.app"
 ]
 
 
-if frontend_url:
+frontend_url = os.getenv(
+    "FRONTEND_URL",
+    ""
+).strip().rstrip("/")
+
+
+if frontend_url and frontend_url not in allowed_origins:
+
     allowed_origins.append(
         frontend_url
     )
