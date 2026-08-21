@@ -29,56 +29,36 @@ from app.routes.screening_routes import (
 
 
 app = FastAPI(
-
     title="Smart Resume Screener",
-
-    description=
-        "AI-powered resume screening system",
-
+    description="AI-powered resume screening system",
     version="1.0.0"
-
 )
 
 
 frontend_url = os.getenv(
     "FRONTEND_URL",
     ""
-)
+).strip()
 
 
 allowed_origins = [
-
     "http://localhost:5173",
-
     "http://127.0.0.1:5173"
-
 ]
 
 
 if frontend_url:
-
     allowed_origins.append(
         frontend_url
     )
 
 
 app.add_middleware(
-
     CORSMiddleware,
-
-    allow_origins=
-        allowed_origins,
-
+    allow_origins=allowed_origins,
     allow_credentials=True,
-
-    allow_methods=[
-        "*"
-    ],
-
-    allow_headers=[
-        "*"
-    ]
-
+    allow_methods=["*"],
+    allow_headers=["*"]
 )
 
 
@@ -86,16 +66,13 @@ app.include_router(
     resume_router
 )
 
-
 app.include_router(
     job_router
 )
 
-
 app.include_router(
     screening_router
 )
-
 
 app.include_router(
     auth_router
@@ -106,10 +83,8 @@ app.include_router(
 def home():
 
     return {
-
         "message":
             "Smart Resume Screener API is running"
-
     }
 
 
@@ -121,7 +96,6 @@ def health():
     )
 
     return {
-
         "status":
             "healthy",
 
@@ -129,7 +103,6 @@ def health():
             "connected"
             if database_status
             else "disconnected"
-
     }
 
 
@@ -137,9 +110,7 @@ def health():
 def test_database():
 
     document = {
-
-        "test":
-            True,
+        "test": True,
 
         "message":
             "MongoDB connection is working",
@@ -148,23 +119,16 @@ def test_database():
             datetime.now(
                 timezone.utc
             )
-
     }
 
-
     result = (
-
         candidates_collection
-
         .insert_one(
             document
         )
-
     )
 
-
     return {
-
         "message":
             "Document inserted successfully",
 
@@ -172,5 +136,4 @@ def test_database():
             str(
                 result.inserted_id
             )
-
     }
