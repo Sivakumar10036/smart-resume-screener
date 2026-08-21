@@ -1,0 +1,22 @@
+Siva Kumar
+
+Email: siva@example.com
+
+Education:
+B.Tech Computer Science and Engineering
+
+Skills:
+Python
+Java
+JavaScript
+React
+FastAPI
+MongoDB
+SQL
+
+Experience:
+Software Developer Intern
+
+Worked on web applications using React and Python.
+Developed REST APIs using FastAPI.
+Worked with MongoDB databases.
