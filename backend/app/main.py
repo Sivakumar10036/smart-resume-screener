@@ -38,7 +38,10 @@ app = FastAPI(
 allowed_origins = [
     "http://localhost:5173",
     "http://127.0.0.1:5173",
-    "https://smart-resume-ai-screener.vercel.app"
+
+    "https://smart-resume-ai-screener.vercel.app",
+
+    "https://smart-resume-screener-amber.vercel.app"
 ]
 
 
@@ -48,18 +51,24 @@ frontend_url = os.getenv(
 ).strip().rstrip("/")
 
 
-if frontend_url and frontend_url not in allowed_origins:
+if frontend_url:
 
-    allowed_origins.append(
-        frontend_url
-    )
+    if frontend_url not in allowed_origins:
+
+        allowed_origins.append(
+            frontend_url
+        )
 
 
 app.add_middleware(
     CORSMiddleware,
+
     allow_origins=allowed_origins,
+
     allow_credentials=True,
+
     allow_methods=["*"],
+
     allow_headers=["*"]
 )
 
@@ -98,6 +107,7 @@ def health():
     )
 
     return {
+
         "status":
             "healthy",
 
@@ -112,7 +122,9 @@ def health():
 def test_database():
 
     document = {
-        "test": True,
+
+        "test":
+            True,
 
         "message":
             "MongoDB connection is working",
@@ -131,6 +143,7 @@ def test_database():
     )
 
     return {
+
         "message":
             "Document inserted successfully",
 
