@@ -136,7 +136,7 @@ function ScreeningResults()
 
 
             if (
-                numericScore >= 55
+                numericScore >= 50
             )
             {
                 return "REVIEW";
@@ -212,40 +212,6 @@ function ScreeningResults()
     const getRecommendation =
         result =>
         {
-            const existingRecommendation =
-                String(
-                    result?.recommendation ||
-                    ""
-                ).toUpperCase();
-
-
-            if (
-                existingRecommendation ===
-                "SHORTLIST"
-            )
-            {
-                return "SHORTLIST";
-            }
-
-
-            if (
-                existingRecommendation ===
-                "REVIEW"
-            )
-            {
-                return "REVIEW";
-            }
-
-
-            if (
-                existingRecommendation ===
-                "REJECT"
-            )
-            {
-                return "REJECT";
-            }
-
-
             return getRecommendationFromScore(
                 getScore(
                     result
@@ -303,7 +269,7 @@ function ScreeningResults()
 
 
             if (
-                numericScore >= 55
+                numericScore >= 50
             )
             {
                 return "score-medium";
@@ -405,7 +371,6 @@ function ScreeningResults()
                     score,
 
                 recommendation:
-                    result?.recommendation ||
                     getRecommendationFromScore(
                         score
                     ),
@@ -1124,7 +1089,6 @@ function ScreeningResults()
                         score,
 
                     recommendation:
-                        apiResult?.recommendation ||
                         getRecommendationFromScore(
                             score
                         ),
@@ -1330,7 +1294,6 @@ function ScreeningResults()
                                     score,
 
                                 recommendation:
-                                    result.recommendation ||
                                     getRecommendationFromScore(
                                         score
                                     )

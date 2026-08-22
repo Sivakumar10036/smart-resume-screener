@@ -41,7 +41,7 @@ allowed_origins = [
 
     "https://smart-resume-ai-screener.vercel.app",
 
-    "https://smart-resume-screener-amber.vercel.app"
+    "https://smart-resume-screener-amber.vercel.app"    
 ]
 
 
